@@ -1,6 +1,6 @@
-# Workflow Escrow Refund Protocol
+# Arc Escrow
 
-Automate escrow-backed freelance agreements with AI-powered work validation using USDC on Arc testnet. This sample application uses Next.js, Supabase, Circle Developer Controlled Wallets, and OpenAI to demonstrate an end-to-end escrow workflow — from contract creation and deposit, through AI-validated deliverable submission, to fund release or refund.
+Automate escrow-backed freelance agreements with AI-powered work validation using USDC on Arc testnet. This sample application uses Circle Developer Controlled Wallets, [Circle Refund Protocol](https://github.com/circlefin/refund-protocol), Next.js, Supabase, and OpenAI to demonstrate an end-to-end escrow workflow — from contract creation and deposit, through AI-validated deliverable submission, to fund release or refund.
 
 <img width="830" height="467" alt="Escrow agreement dashboard" src="public/screenshot.png" />
 
