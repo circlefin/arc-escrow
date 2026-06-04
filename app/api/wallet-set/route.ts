@@ -17,10 +17,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 
 export async function PUT(req: NextRequest) {
   try {
+    const supabase = createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { entityName } = await req.json();
 
     if (!entityName.trim()) {

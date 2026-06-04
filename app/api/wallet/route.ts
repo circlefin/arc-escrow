@@ -18,10 +18,17 @@
 
 import type { Blockchain } from "@circle-fin/smart-contract-platform";
 import { NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { walletSetId } = await req.json();
 
     if (!walletSetId) {
