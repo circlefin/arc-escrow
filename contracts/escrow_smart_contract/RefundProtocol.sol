@@ -116,13 +116,14 @@ contract RefundProtocol is EIP712 {
             revert CallerNotAllowed();
         }
 
+        uint256 refundAmount = payment.amount - payment.withdrawnAmount;
         uint256 recipientBalance = balances[payment.to];
 
-        if (payment.amount > recipientBalance) {
+        if (refundAmount > recipientBalance) {
             revert InsufficientFunds();
         }
 
-        balances[payment.to] = recipientBalance - payment.amount;
+        balances[payment.to] = recipientBalance - refundAmount;
 
         _executeRefund(paymentID, payment);
     }
@@ -137,21 +138,22 @@ contract RefundProtocol is EIP712 {
     function refundByArbiter(uint256 paymentID) external onlyArbiter {
         Payment memory payment = payments[paymentID];
 
+        uint256 refundAmount = payment.amount - payment.withdrawnAmount;
         uint256 recipientBalance = balances[payment.to];
 
-        if (payment.amount <= recipientBalance) {
-            balances[payment.to] = recipientBalance - payment.amount;
+        if (refundAmount <= recipientBalance) {
+            balances[payment.to] = recipientBalance - refundAmount;
             return _executeRefund(paymentID, payment);
         }
 
         uint256 arbiterBalance = balances[arbiter];
 
-        if (payment.amount > arbiterBalance) {
+        if (refundAmount > arbiterBalance) {
             revert InsufficientFunds();
         }
 
-        balances[arbiter] = arbiterBalance - payment.amount;
-        debts[payment.to] += payment.amount;
+        balances[arbiter] = arbiterBalance - refundAmount;
+        debts[payment.to] += refundAmount;
 
         _executeRefund(paymentID, payment);
     }
@@ -345,11 +347,12 @@ contract RefundProtocol is EIP712 {
         if (payment.refunded) {
             revert PaymentRefunded(paymentID);
         }
-        fiatToken.transfer(payment.refundTo, payment.amount);
-
+        uint256 refundAmount = payment.amount - payment.withdrawnAmount;
+        if (refundAmount > 0) {
+            fiatToken.transfer(payment.refundTo, refundAmount);
+        }
         payments[paymentID].refunded = true;
-
-        emit Refund(paymentID, payment.refundTo, payment.amount);
+        emit Refund(paymentID, payment.refundTo, refundAmount);
     }
 
     /**
