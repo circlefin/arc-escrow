@@ -20,12 +20,9 @@
 
 import { encodedRedirect } from "@/lib/utils/utils";
 import { createClient } from "@/lib/utils/supabase/server";
+import { createWalletSet, createWallet } from "@/lib/wallet-provisioning";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-
-const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? process.env.NEXT_PUBLIC_VERCEL_URL
-  : "http://localhost:3000";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -61,29 +58,8 @@ export const signUpAction = async (formData: FormData) => {
   }
 
   try {
-    const createdWalletSetResponse = await fetch(`${baseUrl}/api/wallet-set`, {
-      method: "PUT",
-      body: JSON.stringify({
-        entityName: email,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const createdWalletSet = await createdWalletSetResponse.json();
-
-    const createdWalletResponse = await fetch(`${baseUrl}/api/wallet`, {
-      method: "POST",
-      body: JSON.stringify({
-        walletSetId: createdWalletSet.id,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const createdWallet = await createdWalletResponse.json();
+    const createdWalletSet = await createWalletSet(email);
+    const createdWallet = await createWallet(createdWalletSet.id);
 
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")

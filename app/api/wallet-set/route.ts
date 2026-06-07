@@ -18,7 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
+import { createWalletSet } from "@/lib/wallet-provisioning";
 
 export async function PUT(req: NextRequest) {
   try {
@@ -37,18 +37,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const response = await circleDeveloperSdk.createWalletSet({
-      name: entityName,
-    });
+    const walletSet = await createWalletSet(entityName);
 
-    if (!response.data) {
-      return NextResponse.json(
-        "The response did not include a valid wallet set",
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ ...response.data.walletSet }, { status: 201 });
+    return NextResponse.json({ ...walletSet }, { status: 201 });
   } catch (error: any) {
     console.error(`Wallet set creation failed: ${error.message}`);
     return NextResponse.json(
