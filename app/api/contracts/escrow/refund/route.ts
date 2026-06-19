@@ -95,6 +95,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not find a profile linked to the given wallet ID" }, { status: 500 });
     }
 
+    // Verify the caller is the beneficiary of this agreement
+    const isBeneficiary =
+      contractTransaction.beneficiary_wallet_id === depositorWallet.id;
+
+    if (!isBeneficiary) {
+      return NextResponse.json(
+        { error: "Forbidden: Only the beneficiary can initiate a refund" },
+        { status: 403 }
+      );
+    }
+
     // Retrieves contract data from Circle's SDK
     const contractData = await circleContractSdk.getContract({
       id: contractTransaction.circle_contract_id
