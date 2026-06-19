@@ -17,6 +17,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 import { z } from "zod";
 
@@ -52,6 +53,12 @@ export async function POST(
   req: NextRequest,
 ): Promise<NextResponse<WalletTransactionsResponse>> {
   try {
+    const supabase = createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const parseResult = WalletIdSchema.safeParse(body);
 
@@ -63,6 +70,25 @@ export async function POST(
     }
 
     const { walletId } = parseResult.data;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single();
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: walletRecord } = await supabase
+      .from("wallets")
+      .select("id")
+      .eq("circle_wallet_id", walletId)
+      .eq("profile_id", profile.id)
+      .single();
+    if (!walletRecord) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const response = await circleDeveloperSdk.listTransactions({
       walletIds: [walletId],

@@ -17,6 +17,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 import { z } from "zod";
 
@@ -48,6 +49,31 @@ export async function GET(
   { params }: { params: { id: string } },
 ): Promise<NextResponse<TransactionResponse>> {
   try {
+    const supabase = createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .single();
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: txRecord } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("circle_transaction_id", params.id)
+      .eq("profile_id", profile.id)
+      .single();
+    if (!txRecord) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // Validate the transaction ID is a Circle's transaction IDs
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

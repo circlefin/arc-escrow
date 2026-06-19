@@ -17,6 +17,7 @@
  */
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { createWalletSet, createWallet } from "@/lib/wallet-provisioning";
 import { NextResponse } from "next/server";
 
 const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
@@ -61,29 +62,8 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${baseUrl}/${nextUrl}`);
       }
 
-      const createdWalletSetResponse = await fetch(`${baseUrl}/api/wallet-set`, {
-        method: "PUT",
-        body: JSON.stringify({
-          entityName: data.user.email,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const createdWalletSet = await createdWalletSetResponse.json();
-
-      const createdWalletResponse = await fetch(`${baseUrl}/api/wallet`, {
-        method: "POST",
-        body: JSON.stringify({
-          walletSetId: createdWalletSet.id,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const createdWallet = await createdWalletResponse.json();
+      const createdWalletSet = await createWalletSet(data.user.email!);
+      const createdWallet = await createWallet(createdWalletSet.id);
 
       await supabase
         .schema("public")

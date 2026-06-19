@@ -16,12 +16,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Blockchain } from "@circle-fin/smart-contract-platform";
 import { NextRequest, NextResponse } from "next/server";
-import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { createWallet } from "@/lib/wallet-provisioning";
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { walletSetId } = await req.json();
 
     if (!walletSetId) {
@@ -31,27 +37,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!process.env.CIRCLE_BLOCKCHAIN) {
-      throw new Error("CIRCLE_BLOCKCHAIN environment variable is not set");
-    }
+    const wallet = await createWallet(walletSetId);
 
-    const response = await circleDeveloperSdk.createWallets({
-      accountType: "SCA",
-      blockchains: [process.env.CIRCLE_BLOCKCHAIN as Blockchain],
-      count: 1,
-      walletSetId,
-    });
-
-    if (!response.data?.wallets?.length) {
-      return NextResponse.json(
-        { error: "No wallets were created" },
-        { status: 500 }
-      );
-    }
-
-    const [createdWallet] = response.data.wallets;
-
-    return NextResponse.json(createdWallet, { status: 201 });
+    return NextResponse.json(wallet, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
