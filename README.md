@@ -27,7 +27,7 @@ Automate escrow-backed freelance agreements with AI-powered work validation usin
 
    ```bash
    git clone git@github.com:circlefin/arc-escrow.git
-   cd workflow-escrow-refund-protocol
+   cd arc-escrow
    npm install
    ```
 
