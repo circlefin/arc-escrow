@@ -26,7 +26,7 @@ Automate escrow-backed freelance agreements with AI-powered work validation usin
 1. Clone the repository and install dependencies:
 
    ```bash
-   git clone git@github.com:akelani-circle/workflow-escrow-refund-protocol.git
+   git clone git@github.com:circlefin/arc-escrow.git
    cd workflow-escrow-refund-protocol
    npm install
    ```
