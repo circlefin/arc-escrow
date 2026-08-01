@@ -5,7 +5,7 @@
     "build": "next build",
     "start": "next start",
     "generate-wallet": "node generate-wallet.mjs",
-    "trace:register": "node --env-file=.env scripts/register-trace-webhooks.mjs"
+    "trace:register": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/register-trace-webhooks.mjs"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^4.6.0",
