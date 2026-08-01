@@ -171,3 +171,28 @@ This sample application:
 - Handles secrets via environment variables
 - Verifies webhook signatures for security
 - Is not intended for production use without modification
+
+## Haia Trace integration
+
+This fork adds a passive [Haia Trace](https://github.com/Haia-Finance/haia-trace)
+observer that turns the escrow flow into verifiable Operation Receipts. The
+diff from upstream is deliberately small:
+
+- `app/api/webhooks/trace/route.ts` — a second webhook endpoint (Circle
+  requires a unique URL per subscription) that verifies, deduplicates, and
+  records deliveries as normalized events in `.trace/events/`.
+- `lib/trace/monitors.ts` — registers Circle event monitors for each
+  agreement's contract when its deployment completes, so
+  `contracts.eventLog` notifications flow for `PaymentCreated` /
+  `Withdrawal` / `Refund`.
+- `scripts/register-trace-webhooks.mjs` — one-shot setup of the Trace
+  subscription and monitored-tokens scope:
+  `npm run trace:register -- https://<your-tunnel>.ngrok.app`
+- `vendor/*.tgz` — the `@usehaia/trace-*` packages, vendored until their npm
+  release.
+
+After a flow runs, build the receipt from the recorded events:
+
+```sh
+npx @usehaia/trace-cli build --template escrow-arc
+```
