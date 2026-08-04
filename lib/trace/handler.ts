@@ -11,8 +11,21 @@
  * delivery, instead of acknowledging something that was never recorded.
  */
 
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
 import { createFileEventWriter } from "@usehaia/trace-core/file";
 import { createVerifier, createWebhookHandler } from "@usehaia/trace-circle";
+
+const EVENTS_PATH = ".trace/events/webhooks.ndjson";
+
+// `createFileEventWriter` appends to a path it is given and does not create
+// directories — that is `createRunEventWriter`'s job, and we want the stable
+// file name rather than one run file per restart. So the directory is ours to
+// ensure, once, before the first delivery: without it every append fails with
+// ENOENT, the handler answers 500, and Circle cannot even verify the endpoint
+// when the subscription is created.
+mkdirSync(dirname(EVENTS_PATH), { recursive: true });
 
 /**
  * Fetch Circle's notification-signing public key. Requires our API key, which
@@ -45,7 +58,7 @@ async function resolveKey(keyId: string): Promise<string | null> {
 
 export const traceWebhookHandler = createWebhookHandler({
   verifier: createVerifier({ resolveKey }),
-  write: createFileEventWriter(".trace/events/webhooks.ndjson", (err: unknown) => {
+  write: createFileEventWriter(EVENTS_PATH, (err: unknown) => {
     // Fail loud: a swallowed write would stop Circle's retries and lose the
     // event forever. The handler catches this and answers 500.
     throw err;
