@@ -19,6 +19,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { ensureEscrowMonitors } from "@/lib/trace/monitors";
 
 const baseUrl = process.env.VERCEL_URL
   ? process.env.VERCEL_URL
@@ -66,6 +67,15 @@ async function updateAgreementTransaction(transactionId: string, notification: R
         .from("escrow_agreements")
         .update({ status: "OPEN" })
         .eq("id", agreement.id);
+
+      // Trace: the contract is deployed per agreement, so its event monitors
+      // are registered here — the one place the new address is known for sure.
+      // Best-effort: a registration failure must not fail this webhook.
+      if (notification.contractAddress) {
+        await ensureEscrowMonitors(notification.contractAddress).catch(
+          (error) => console.error("[trace] monitor registration failed:", error),
+        );
+      }
 
       return;
     }

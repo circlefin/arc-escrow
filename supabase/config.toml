@@ -257,7 +257,10 @@ policy = "oneshot"
 inspector_port = 8083
 
 [analytics]
-enabled = true
+# Disabled for the local stand: analytics pulls in the `vector` log collector,
+# which fails its health check here and takes the whole `supabase start` down
+# with it. Nothing in the app reads these logs.
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
