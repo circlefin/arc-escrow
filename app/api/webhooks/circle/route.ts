@@ -154,16 +154,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    // Circle signs the RAW request bytes; verify against them, not a re-encode.
+    const rawBody = await req.text();
 
-    // Convert to a string for signature verification
-    const bodyString = JSON.stringify(body);
-
-    const isVerified = await verifyCircleSignature(bodyString, signature, keyId);
-
+    const isVerified = await verifyCircleSignature(rawBody, signature, keyId);
     if (!isVerified) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
+
+    // Parse only AFTER verification succeeds.
+    const body = JSON.parse(rawBody);
 
     console.log("Received notification:", body);
 
@@ -215,45 +215,82 @@ async function verifyCircleSignature(
   signature: string,
   keyId: string
 ): Promise<boolean> {
-  const publicKey = await getCirclePublicKey(keyId);
+  try {
+    const publicKey = await getCirclePublicKey(keyId);
 
-  const verifier = crypto.createVerify("SHA256");
-  verifier.update(bodyString);
-  verifier.end();
+    const verifier = crypto.createVerify("SHA256");
+    verifier.update(bodyString);
+    verifier.end();
 
-  // Convert the Buffer to a Uint8Array for compatibility
-  const signatureUint8Array = Uint8Array.from(Buffer.from(signature, "base64"));
-  return verifier.verify(publicKey, signatureUint8Array);
+    // Convert the Buffer to a Uint8Array for compatibility
+    const signatureUint8Array = Uint8Array.from(Buffer.from(signature, "base64"));
+    return verifier.verify(publicKey, signatureUint8Array);
+  } catch (error) {
+    console.error("Signature verification error:", error);
+    return false;
+  }
 }
 
-// Function to get Circle’s public key using their API
-async function getCirclePublicKey(keyId: string) {
+// --- module scope caching & validation ------------------------------------
+
+// Circle notification key ids are UUIDs. Reject anything else before it ever
+// reaches an outbound URL — prevents path-shaping into api.circle.com.
+const KEY_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Public keys rotate rarely; cache per-process to turn N webhooks into 1 fetch
+// and to stop unauthenticated callers from amplifying into Circle's API.
+const PUBLIC_KEY_TTL_MS = 10 * 60 * 1000;
+const publicKeyCache = new Map<string, { pem: string; expiresAt: number }>();
+
+// Get Circle's public key
+async function getCirclePublicKey(keyId: string): Promise<string> {
+  // 1. Validate keyId format to prevent path-injection
+  if (!KEY_ID_RE.test(keyId)) {
+    throw new Error("Invalid key id format");
+  }
+
+  // 2. Check local memory cache
+  const cached = publicKeyCache.get(keyId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.pem;
+  }
+
+  // 3. Fetch from Circle if not cached or expired
   if (!process.env.CIRCLE_API_KEY) {
     throw new Error("Circle API key is not set");
   }
 
-  try {
-    const response = await fetch(`https://api.circle.com/v2/notifications/publicKey/${keyId}`, {
+  const response = await fetch(
+    `https://api.circle.com/v2/notifications/publicKey/${encodeURIComponent(keyId)}`,
+    {
       method: "GET",
       headers: {
-        "Accept": "application/json",
-        "Authorization": `Bearer ${process.env.CIRCLE_API_KEY}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch public key: ${response.statusText}`);
+        Accept: "application/json",
+        Authorization: `Bearer ${process.env.CIRCLE_API_KEY}`,
+      },
     }
+  );
 
-    const data = await response.json();
-    const rawPublicKey = data.data.publicKey;
-
-    // Convert the base64-encoded key to PEM format
-    const pemPublicKey = `-----BEGIN PUBLIC KEY-----\n${rawPublicKey.match(/.{1,64}/g)?.join("\n")}\n-----END PUBLIC KEY-----`;
-
-    return pemPublicKey;
-  } catch (error) {
-    console.error("Error fetching Circle public key:", error);
-    throw new Error("Failed to retrieve Circle public key");
+  if (!response.ok) {
+    throw new Error(`Failed to fetch public key: ${response.statusText || response.status}`);
   }
+
+  const data = await response.json();
+  const rawPublicKey = data?.data?.publicKey || data?.publicKey;
+
+  if (typeof rawPublicKey !== "string" || rawPublicKey.length === 0) {
+    throw new Error("Malformed public key response");
+  }
+
+  const pem = [
+    "-----BEGIN PUBLIC KEY-----",
+    ...(rawPublicKey.match(/.{1,64}/g) ?? []),
+    "-----END PUBLIC KEY-----",
+  ].join("\n");
+
+  // Save to cache
+  publicKeyCache.set(keyId, { pem, expiresAt: Date.now() + PUBLIC_KEY_TTL_MS });
+
+  return pem;
 }
