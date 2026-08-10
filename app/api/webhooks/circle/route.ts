@@ -154,16 +154,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    // Circle signs the RAW request bytes; verify against them, not a re-encode.
+    const rawBody = await req.text();
 
-    // Convert to a string for signature verification
-    const bodyString = JSON.stringify(body);
-
-    const isVerified = await verifyCircleSignature(bodyString, signature, keyId);
-
+    const isVerified = await verifyCircleSignature(rawBody, signature, keyId);
     if (!isVerified) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
+
+    // Parse only AFTER verification succeeds.
+    const body = JSON.parse(rawBody);
 
     console.log("Received notification:", body);
 
