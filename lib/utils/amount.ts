@@ -22,10 +22,14 @@ export const parseAmount = (amountStr: string): number => {
     .replace(/[$€£,\s]/g, "")
     .replace(/−/g, "-");
 
-  // Parse the amount
-  const amount = parseFloat(cleanAmount);
+  // Validate the entire normalized string before parsing
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(cleanAmount)) {
+    throw new Error(`Invalid amount: ${amountStr}`);
+  }
 
-  if (Number.isNaN(amount) || amount <= 0) {
+  const amount = Number(cleanAmount);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error(`Invalid amount: ${amountStr}`);
   }
 
