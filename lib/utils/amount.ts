@@ -22,10 +22,16 @@ export const parseAmount = (amountStr: string): number => {
     .replace(/[$€£,\s]/g, "")
     .replace(/−/g, "-");
 
-  // Parse the amount
+  // The cleaned string must be a plain decimal in its entirety. parseFloat
+  // accepts a valid numeric prefix and ignores the rest, so "10abc" would parse
+  // as 10 and "1e5" as 100000 — both silently altering a monetary value.
+  if (!/^\d+(\.\d+)?$/.test(cleanAmount)) {
+    throw new Error(`Invalid amount: ${amountStr}`);
+  }
+
   const amount = parseFloat(cleanAmount);
 
-  if (Number.isNaN(amount) || amount <= 0) {
+  if (amount <= 0) {
     throw new Error(`Invalid amount: ${amountStr}`);
   }
 
