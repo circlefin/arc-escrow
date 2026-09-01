@@ -33,5 +33,9 @@ export const parseAmount = (amountStr: string): number => {
 };
 
 export function convertUSDCToContractAmount(amount: number): string {
-  return (amount * 1000000).toString();
+  // Round to whole base units: USDC has 6 decimals and the value is passed as a
+  // uint256, so the result has to be an integer. amount * 1000000 is float math,
+  // and ordinary amounts like 2.01 land just under (2009999.9999999998), which
+  // .toString() would carry through as a fractional, invalid on-chain amount.
+  return Math.round(amount * 1000000).toString();
 }
