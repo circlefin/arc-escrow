@@ -95,6 +95,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not find a profile linked to the given wallet ID" }, { status: 500 });
     }
 
+    const isAgreementParty =
+      depositorWallet.id === contractTransaction.depositor_wallet_id ||
+      depositorWallet.id === contractTransaction.beneficiary_wallet_id;
+
+    if (!isAgreementParty) {
+      return NextResponse.json(
+        { error: "You are not authorized to refund this escrow agreement" },
+        { status: 403 }
+      );
+    }
+
     // Retrieves contract data from Circle's SDK
     const contractData = await circleContractSdk.getContract({
       id: contractTransaction.circle_contract_id
