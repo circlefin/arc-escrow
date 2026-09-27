@@ -15,9 +15,12 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 contract RefundProtocol is EIP712 {
+    using SafeERC20 for IERC20;
+
     struct Payment {
         address to;
         uint256 amount;
@@ -97,7 +100,7 @@ contract RefundProtocol is EIP712 {
             revert RefundToIsZeroAddress();
         }
 
-        fiatToken.transferFrom(msg.sender, address(this), amount);
+        fiatToken.safeTransferFrom(msg.sender, address(this), amount);
         payments[nonce] = Payment(to, amount, block.timestamp, refundTo, 0, false);
         balances[to] += amount;
 
@@ -116,15 +119,20 @@ contract RefundProtocol is EIP712 {
             revert CallerNotAllowed();
         }
 
+        uint256 refundAmount = payment.amount - payment.withdrawnAmount;
+        if (refundAmount == 0) {
+            revert PaymentRefunded(paymentID);
+        }
+
         uint256 recipientBalance = balances[payment.to];
 
-        if (payment.amount > recipientBalance) {
+        if (refundAmount > recipientBalance) {
             revert InsufficientFunds();
         }
 
-        balances[payment.to] = recipientBalance - payment.amount;
+        balances[payment.to] = recipientBalance - refundAmount;
 
-        _executeRefund(paymentID, payment);
+        _executeRefund(paymentID, payment, refundAmount);
     }
 
     /**
@@ -137,23 +145,28 @@ contract RefundProtocol is EIP712 {
     function refundByArbiter(uint256 paymentID) external onlyArbiter {
         Payment memory payment = payments[paymentID];
 
+        uint256 refundAmount = payment.amount - payment.withdrawnAmount;
+        if (refundAmount == 0) {
+            revert PaymentRefunded(paymentID);
+        }
+
         uint256 recipientBalance = balances[payment.to];
 
-        if (payment.amount <= recipientBalance) {
-            balances[payment.to] = recipientBalance - payment.amount;
-            return _executeRefund(paymentID, payment);
+        if (refundAmount <= recipientBalance) {
+            balances[payment.to] = recipientBalance - refundAmount;
+            return _executeRefund(paymentID, payment, refundAmount);
         }
 
         uint256 arbiterBalance = balances[arbiter];
 
-        if (payment.amount > arbiterBalance) {
+        if (refundAmount > arbiterBalance) {
             revert InsufficientFunds();
         }
 
-        balances[arbiter] = arbiterBalance - payment.amount;
-        debts[payment.to] += payment.amount;
+        balances[arbiter] = arbiterBalance - refundAmount;
+        debts[payment.to] += refundAmount;
 
-        _executeRefund(paymentID, payment);
+        _executeRefund(paymentID, payment, refundAmount);
     }
 
     /**
@@ -170,7 +183,7 @@ contract RefundProtocol is EIP712 {
      * @param amount amount to deposit
      */
     function depositArbiterFunds(uint256 amount) external onlyArbiter {
-        fiatToken.transferFrom(msg.sender, address(this), amount);
+        fiatToken.safeTransferFrom(msg.sender, address(this), amount);
         balances[arbiter] += amount;
     }
 
@@ -186,7 +199,7 @@ contract RefundProtocol is EIP712 {
         }
 
         balances[arbiter] = arbiterBalance - amount;
-        fiatToken.transfer(arbiter, amount);
+        fiatToken.safeTransfer(arbiter, amount);
     }
 
     /**
@@ -209,15 +222,22 @@ contract RefundProtocol is EIP712 {
             if (payment.refunded) {
                 revert PaymentRefunded(paymentIDs[i]);
             }
-            totalAmount += payment.amount - payment.withdrawnAmount;
+            uint256 remaining = payment.amount - payment.withdrawnAmount;
+            if (remaining == 0) {
+                revert PaymentRefunded(paymentIDs[i]);
+            }
+            totalAmount += remaining;
             payments[paymentIDs[i]].withdrawnAmount = payment.amount;
+            // Fully withdrawn payments must not be refundable (avoids double-pay
+            // against the shared recipient balance pool).
+            payments[paymentIDs[i]].refunded = true;
         }
         uint256 recipientBalance = balances[msg.sender];
         if (totalAmount > recipientBalance) {
             revert InsufficientFunds();
         }
         balances[msg.sender] = recipientBalance - totalAmount;
-        fiatToken.transfer(msg.sender, totalAmount);
+        fiatToken.safeTransfer(msg.sender, totalAmount);
         emit Withdrawal(msg.sender, totalAmount);
     }
 
@@ -294,7 +314,7 @@ contract RefundProtocol is EIP712 {
         balances[recipient] = recipientBalance - totalAmount;
         balances[arbiter] += feeAmount;
 
-        fiatToken.transfer(recipient, totalAmount - feeAmount);
+        fiatToken.safeTransfer(recipient, totalAmount - feeAmount);
         emit Withdrawal(recipient, totalAmount);
         emit WithdrawalFeePaid(recipient, feeAmount);
 
@@ -341,15 +361,18 @@ contract RefundProtocol is EIP712 {
      * @param paymentID the payment ID to refund
      * @param payment the payment struct
      */
-    function _executeRefund(uint256 paymentID, Payment memory payment) internal {
+    function _executeRefund(uint256 paymentID, Payment memory payment, uint256 refundAmount) internal {
         if (payment.refunded) {
             revert PaymentRefunded(paymentID);
         }
-        fiatToken.transfer(payment.refundTo, payment.amount);
+        if (refundAmount == 0) {
+            revert PaymentRefunded(paymentID);
+        }
+        fiatToken.safeTransfer(payment.refundTo, refundAmount);
 
         payments[paymentID].refunded = true;
 
-        emit Refund(paymentID, payment.refundTo, payment.amount);
+        emit Refund(paymentID, payment.refundTo, refundAmount);
     }
 
     /**
