@@ -16,16 +16,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/** Entire string must be a decimal number (optional leading sign). */
+const AMOUNT_PATTERN = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/;
+
 export const parseAmount = (amountStr: string): number => {
   const cleanAmount = amountStr
     .replace(/[()]/g, "")
     .replace(/[$€£,\s]/g, "")
     .replace(/−/g, "-");
 
-  // Parse the amount
-  const amount = parseFloat(cleanAmount);
+  if (!AMOUNT_PATTERN.test(cleanAmount)) {
+    throw new Error(`Invalid amount: ${amountStr}`);
+  }
 
-  if (Number.isNaN(amount) || amount <= 0) {
+  const amount = Number(cleanAmount);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error(`Invalid amount: ${amountStr}`);
   }
 
