@@ -61,14 +61,3 @@ export const executeContract = async ({
     throw new Error(`Failed to execute contract: ${message}`);
   }
 };
-
-// Example usage:
-/*
-await executeContract({
-  walletId: "wallet_123",
-  contractAddress: "0x1234...5678",
-  abiFunctionSignature: "transfer(address,uint256)",
-  abiParameters: ["0xabcd...efgh", "1000000000000000000"],
-  feeLevel: "HIGH"
-});
-*/

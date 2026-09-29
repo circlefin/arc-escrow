@@ -28,9 +28,7 @@ if (!CIRCLE_ENTITY_SECRET?.trim()) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["pdf-parse"],
-  },
+  serverExternalPackages: ["pdf-parse"],
 };
 
 module.exports = nextConfig;

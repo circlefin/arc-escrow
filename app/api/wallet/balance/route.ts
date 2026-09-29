@@ -17,8 +17,15 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 import { z } from "zod";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import {
+  forbidden,
+  getAuthenticatedUser,
+  getOwnWallet,
+  unauthorized,
+} from "@/lib/auth/session";
+import { getUsdcBalance } from "@/lib/circle/wallet-data";
 
 const WalletIdSchema = z.object({
   walletId: z.string().uuid(),
@@ -35,6 +42,10 @@ export async function POST(
   req: NextRequest,
 ): Promise<NextResponse<WalletBalanceResponse>> {
   try {
+    const supabase = await createSupabaseServerClient();
+    const user = await getAuthenticatedUser(supabase);
+    if (!user) return unauthorized() as NextResponse<WalletBalanceResponse>;
+
     const body = await req.json();
     const parseResult = WalletIdSchema.safeParse(body);
 
@@ -47,16 +58,13 @@ export async function POST(
 
     const { walletId } = parseResult.data;
 
-    const response = await circleDeveloperSdk.getWalletTokenBalance({
-      id: walletId,
-      includeAll: true,
-    });
+    // Only your own wallet: any signed-in user can list every wallet id.
+    const ownWallet = await getOwnWallet(supabase, user.id);
+    if (!ownWallet || ownWallet.circle_wallet_id !== walletId) {
+      return forbidden() as NextResponse<WalletBalanceResponse>;
+    }
 
-    const balance = response.data?.tokenBalances?.find(
-      ({ token }) => token.symbol === "USDC",
-    )?.amount;
-
-    return NextResponse.json({ balance: balance || "0" });
+    return NextResponse.json({ balance: await getUsdcBalance(walletId) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

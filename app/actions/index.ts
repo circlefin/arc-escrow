@@ -18,33 +18,32 @@
 
 "use server";
 
-import { encodedRedirect } from "@/lib/utils/utils";
-import { createClient } from "@/lib/utils/supabase/server";
+import { getErrorMessage } from "@/lib/utils/utils";
+import { encodedRedirect } from "@/lib/flash-redirect";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin-client";
+import { createUserWallet } from "@/lib/utils/create-user-wallet";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-
-const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? process.env.NEXT_PUBLIC_VERCEL_URL
-  : "http://localhost:3000";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
   const companyName = formData.get("company-name")?.toString().trim();
   const fullName = formData.get("full-name")?.toString().trim();
-  const supabase = createClient();
-  const origin = headers().get("origin");
+  const supabase = await createSupabaseServerClient();
+  const origin = (await headers()).get("origin");
 
   if (fullName && (fullName.length < 3 || fullName.length > 255)) {
-    return { error: "Full name must be between 3 and 255 characters" };
+    return encodedRedirect("error", "/sign-up", "Full name must be between 3 and 255 characters");
   }
 
   if (companyName && (companyName.length < 3 || companyName.length > 255)) {
-    return { error: "Company name must be between 3 and 255 characters" };
+    return encodedRedirect("error", "/sign-up", "Company name must be between 3 and 255 characters");
   }
 
   if (!email || !password) {
-    return { error: "Email and password are required" };
+    return encodedRedirect("error", "/sign-up", "Email and password are required");
   }
 
   const { error, data: authData } = await supabase.auth.signUp({
@@ -60,72 +59,43 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-up", error.message);
   }
 
+  const newUser = authData.user;
+
+  if (!newUser) {
+    return encodedRedirect("error", "/sign-up", "Could not create your account");
+  }
+
+  // Uses the secret key: a new user has no session until they confirm their email.
+  const supabaseAdmin = createSupabaseAdminClient();
+
   try {
-    const createdWalletSetResponse = await fetch(`${baseUrl}/api/wallet-set`, {
-      method: "PUT",
-      body: JSON.stringify({
-        entityName: email,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const createdWalletSet = await createdWalletSetResponse.json();
-
-    const createdWalletResponse = await fetch(`${baseUrl}/api/wallet`, {
-      method: "POST",
-      body: JSON.stringify({
-        walletSetId: createdWalletSet.id,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const createdWallet = await createdWalletResponse.json();
-
-    const { data: profileData, error: profileError } = await supabase
+    const { data: profileData, error: profileError } = await supabaseAdmin
       .from("profiles")
       .update({
         email,
         full_name: fullName,
         company_name: companyName
       })
-      .eq("auth_user_id", authData.user?.id)
+      .eq("auth_user_id", newUser.id)
       .select()
       .single();
 
     if (profileError) {
-      console.error("Error while attempting to create user:", profileError);
-      return { error: "Could not create user" };
+      console.error("Could not save the new profile:", profileError);
+      throw new Error("Could not save your profile");
     }
 
-    const { error: walletError } = await supabase
-      .schema("public")
-      .from("wallets")
-      .insert({
-        profile_id: profileData.id,
-        circle_wallet_id: createdWallet.id,
-        wallet_type: createdWallet.custodyType,
-        wallet_set_id: createdWalletSet.id,
-        wallet_address: createdWallet.address,
-        account_type: createdWallet.accountType,
-        blockchain: createdWallet.blockchain,
-        currency: "USDC",
-      })
-      .select();
+    await createUserWallet(profileData.id, email);
+  } catch (error) {
+    // Roll back so the email can be reused instead of stranding a walletless account.
+    await supabase.auth.signOut();
+    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(newUser.id);
 
-    if (walletError) {
-      console.error(
-        "Error while attempting to create user's wallet:",
-        walletError,
-      );
-      return { error: "Could not create wallet" };
+    if (deleteError) {
+      console.error("Could not remove the incomplete account:", deleteError);
     }
-  } catch (error: any) {
-    console.error(error.message);
-    return { error: error.message };
+
+    return encodedRedirect("error", "/sign-up", getErrorMessage(error));
   }
 
   return redirect("/dashboard");
@@ -134,7 +104,7 @@ export const signUpAction = async (formData: FormData) => {
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const supabase = createClient();
+  const supabase = await createSupabaseServerClient();
 
   const { data: user, error } = await supabase.auth.signInWithPassword({
     email,
@@ -150,8 +120,8 @@ export const signInAction = async (formData: FormData) => {
 
 export const forgotPasswordAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
-  const supabase = createClient();
-  const origin = headers().get("origin");
+  const supabase = await createSupabaseServerClient();
+  const origin = (await headers()).get("origin");
   const callbackUrl = formData.get("callbackUrl")?.toString();
 
   if (!email) {
@@ -159,7 +129,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?redirect_to=/dashboard/reset-password`,
+    redirectTo: `${origin}/auth/callback?next=/dashboard/reset-password`,
   });
 
   if (error) {
@@ -183,13 +153,13 @@ export const forgotPasswordAction = async (formData: FormData) => {
 };
 
 export const resetPasswordAction = async (formData: FormData) => {
-  const supabase = createClient();
+  const supabase = await createSupabaseServerClient();
 
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
 
   if (!password || !confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
       "/dashboard/reset-password",
       "Password and confirm password are required",
@@ -197,7 +167,7 @@ export const resetPasswordAction = async (formData: FormData) => {
   }
 
   if (password !== confirmPassword) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
       "/dashboard/reset-password",
       "Passwords do not match",
@@ -209,18 +179,18 @@ export const resetPasswordAction = async (formData: FormData) => {
   });
 
   if (error) {
-    encodedRedirect(
+    return encodedRedirect(
       "error",
       "/dashboard/reset-password",
       "Password update failed",
     );
   }
 
-  encodedRedirect("success", "/dashboard/reset-password", "Password updated");
+  return encodedRedirect("success", "/dashboard/reset-password", "Password updated");
 };
 
 export const signOutAction = async () => {
-  const supabase = createClient();
+  const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   return redirect("/sign-in");
 };

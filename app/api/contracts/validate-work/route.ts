@@ -24,6 +24,8 @@ import { circleContractSdk } from "@/lib/utils/smart-contract-platform-client";
 import { createAgreementService } from "@/app/services/agreement.service";
 import { parseAmount } from "@/lib/utils/amount";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
+import { authorizeAgreementAction, setAgreementStatus } from "@/lib/auth/agreement-access";
+import { FILE_CONSTANTS } from "@/lib/constants";
 
 interface ImageValidationResult {
   valid: boolean;
@@ -32,7 +34,7 @@ interface ImageValidationResult {
 }
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const agreementService = createAgreementService(supabase);
 
   const {
@@ -58,6 +60,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (imageFile.size > FILE_CONSTANTS.MAX_SIZE_5MB) {
+      return NextResponse.json(
+        { error: "Please upload an image smaller than 5 MB" },
+        { status: 413 },
+      );
+    }
+
     const circleContractId = formData.get("circleContractId");
 
     if (!circleContractId || typeof circleContractId !== "string") {
@@ -68,35 +77,40 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: agreement, error: agreementError } = await supabase
-      .from("escrow_agreements")
-      .select(
-        `
+    // Submitting work releases the escrowed funds from the beneficiary's wallet, so
+    // only the beneficiary may do it, and only while the funds are locked. This runs
+    // before the (paid) AI call so a stranger cannot spend it.
+    const access = await authorizeAgreementAction<{
+      id: string;
+      circle_contract_id: string;
+      beneficiary_wallet_id: string;
+      terms: {
+        tasks: (string | { description?: string })[];
+        amounts: { amount: string }[];
+      };
+      beneficiary_wallet: {
+        circle_wallet_id: string;
+        profiles: { id: string; auth_user_id: string };
+      };
+    }>(supabase, {
+      by: { circleContractId },
+      role: "beneficiary",
+      statuses: ["LOCKED"],
+      select: `
         *,
         beneficiary_wallet:wallets!escrow_agreements_beneficiary_wallet_id_fkey!inner(
           profiles!inner(id,auth_user_id),
           circle_wallet_id
         )
       `,
-      )
-      .eq("circle_contract_id", circleContractId)
-      .single();
-
-    if (agreementError) {
-      console.error(
-        "Failed to retrieve agreement requirements",
-        agreementError,
-      );
-      return NextResponse.json(
-        { error: "Failed to retrieve agreement requirements" },
-        { status: 500 },
-      );
-    }
+    });
+    if (!access.ok) return access.response;
+    const agreement = access.agreement;
 
     const requirements = agreement.terms.tasks
-      .map((task: any) => typeof task === "string" ? task : task.description)
-      .filter(Boolean)
-      .map((task: string) => `- ${task}`)
+      .map((task) => typeof task === "string" ? task : task.description)
+      .filter((task): task is string => Boolean(task))
+      .map((task) => `- ${task}`)
       .join("\n");
 
     const prompt = `
@@ -220,7 +234,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Retrieves contract data from Circle's SDK
     const contractData = await circleContractSdk.getContract({
       id: agreement.circle_contract_id,
     });
@@ -269,7 +282,7 @@ export async function POST(request: Request) {
         },
       });
 
-    const amount = parseAmount((agreement.terms.amounts?.[0] as any).amount);
+    const amount = parseAmount(agreement.terms.amounts[0].amount);
     await agreementService.createTransaction({
       walletId: agreement.beneficiary_wallet_id,
       circleTransactionId: circleReleaseResponse.data?.id,
@@ -285,16 +298,12 @@ export async function POST(request: Request) {
       circleReleaseResponse.data,
     );
 
-    await supabase
-      .from("escrow_agreements")
-      .update({ status: "PENDING" })
-      .eq("id", agreement.id);
+    await setAgreementStatus(agreement.id, "PENDING");
 
     return NextResponse.json({ message: "Image meets all requirements" });
   } catch (error) {
     console.error("Error validating work:", error);
     
-    // Check if it's an OpenAI authentication error
     const isAuthError = error instanceof Error && (
       error.message.includes("API key") || 
       error.message.includes("Incorrect API key") ||

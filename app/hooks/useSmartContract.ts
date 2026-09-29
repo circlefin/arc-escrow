@@ -46,7 +46,7 @@ interface TransactionStatusResponse {
   status?: string;
   transaction?: {
     state: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   error?: string;
   details?: string;
@@ -83,8 +83,8 @@ export function useSmartContract(): UseSmartContractReturn {
       }
 
       return result;
-    } catch (err: any) {
-      const errorMessage = err.message || 'An error occurred while creating the Smart contract';
+    } catch (err) {
+      const errorMessage = (err instanceof Error && err.message) || 'An error occurred while creating the Smart contract';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -108,8 +108,8 @@ export function useSmartContract(): UseSmartContractReturn {
       }
 
       return result;
-    } catch (err: any) {
-      const errorMessage = err.message || 'An error occurred while checking the transaction status';
+    } catch (err) {
+      const errorMessage = (err instanceof Error && err.message) || 'An error occurred while checking the transaction status';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {

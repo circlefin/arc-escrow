@@ -95,7 +95,7 @@ export const createFileService = (supabase: SupabaseClient) => ({
   async getSignedUrl(path: string): Promise<string> {
     const { data, error } = await supabase.storage
       .from(FILE_CONSTANTS.BUCKET_NAME)
-      .createSignedUrl(path, 7 * 24 * 60 * 60); // 7 days
+      .createSignedUrl(path, 7 * 24 * 60 * 60);
 
     if (error || !data?.signedUrl) {
       throw new Error(`Failed to get signed URL: ${error?.message}`);
@@ -119,7 +119,7 @@ export const createFileService = (supabase: SupabaseClient) => ({
         const errorResponse = await response.json();
         errorMessage = errorResponse.details || errorMessage;
       } catch {
-        // Optional: Log the parsing error if needed
+        // Non-JSON error body: keep the default message.
       }
       throw new Error(errorMessage);
     }

@@ -18,6 +18,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&display=swap');
 @import "tailwindcss";
+@import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
@@ -82,7 +83,7 @@
 
 @layer base {
   * {
-    border-color: hsl(var(--border));
+    border-color: var(--border);
   }
   body {
     background-color: hsl(var(--background));
@@ -175,7 +176,7 @@
   --accent-foreground: oklch(0.4444 0.0096 73.6390);
   --destructive: oklch(0.4437 0.1613 26.8994);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: 36 62% 73%;
+  --border: hsl(36 62% 73%);
   --input: oklch(0.8866 0.0404 89.6994);
   --ring: oklch(0.5553 0.1455 48.9975);
   --chart-1: oklch(0.5553 0.1455 48.9975);
@@ -231,7 +232,7 @@
   --accent-foreground: oklch(0.9232 0.0026 48.7171);
   --destructive: oklch(0.5771 0.2152 27.3250);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: 36 62% 73%;
+  --border: hsl(36 62% 73%);
   --input: oklch(0.3741 0.0087 67.5582);
   --ring: oklch(0.7049 0.1867 47.6044);
   --chart-1: oklch(0.7049 0.1867 47.6044);

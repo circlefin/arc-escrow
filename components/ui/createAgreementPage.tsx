@@ -19,7 +19,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/utils/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Card,
@@ -81,7 +81,7 @@ interface EscrowAgreement {
   depositor_wallet_id: string;
   transaction_id: string;
   status: string;
-  terms: any;
+  terms: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -101,12 +101,11 @@ export const CreateAgreementPage = () => {
   );
   const [userId, setUserId] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Get current user
         const {
           data: { user },
           error: userError,
@@ -117,7 +116,6 @@ export const CreateAgreementPage = () => {
 
         setUserId(user.id);
 
-        // Get current user's profile with wallet
         const { data: currentProfile, error: profileError } = await supabase
           .from("profiles")
           .select(
@@ -139,7 +137,6 @@ export const CreateAgreementPage = () => {
         if (profileError) throw profileError;
         setCurrentUserProfile(currentProfile);
 
-        // Get all other profiles with their wallets
         const { data: beneficiaryProfiles, error: beneficiariesError } =
           await supabase
             .from("profiles")
@@ -164,7 +161,6 @@ export const CreateAgreementPage = () => {
           throw new Error("No beneficiary profiles found.");
         }
 
-        // Filter out profiles without wallets
         const validBeneficiaries = beneficiaryProfiles.filter(
           (profile) => profile.wallets && profile.wallets.length > 0
         );

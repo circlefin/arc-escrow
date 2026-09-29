@@ -14,10 +14,8 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
--- First, we'll create a temporary table to store existing profiles
 CREATE TEMP TABLE temp_profiles AS SELECT * FROM profiles;
 
--- Drop dependent foreign keys first
 ALTER TABLE wallets
 DROP CONSTRAINT IF EXISTS wallets_user_id_fkey;
 
@@ -27,16 +25,13 @@ DROP CONSTRAINT IF EXISTS transactions_user_id_fkey;
 ALTER TABLE dispute_resolutions
 DROP CONSTRAINT IF EXISTS dispute_resolutions_resolver_user_id_fkey;
 
--- Drop existing indexes
 DROP INDEX IF EXISTS idx_wallets_user_id;
 DROP INDEX IF EXISTS idx_transactions_user_id;
 DROP INDEX IF EXISTS idx_dispute_resolutions_resolver_user_id;
 
--- Drop existing trigger
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 DROP FUNCTION IF EXISTS handle_new_user();
 
--- Modify the profiles table
 DROP TABLE profiles;
 
 CREATE TABLE profiles (
@@ -50,7 +45,6 @@ CREATE TABLE profiles (
     UNIQUE(auth_user_id)
 );
 
--- Create the new handle_new_user function before restoring data
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER
 SECURITY DEFINER SET search_path = public
@@ -60,7 +54,6 @@ DECLARE
     display_name TEXT;
     new_profile_id UUID;
 BEGIN
-    -- Get display name from raw_user_meta_data if available, otherwise use email
     display_name := COALESCE(
         (NEW.raw_user_meta_data->>'full_name'),
         split_part(NEW.email, '@', 1),
@@ -82,17 +75,15 @@ BEGIN
 END;
 $$;
 
--- Create the trigger
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW
     EXECUTE FUNCTION handle_new_user();
 
--- Restore existing profiles data with proper mapping
 INSERT INTO profiles (id, auth_user_id, name, avatar_url, created_at, updated_at, is_active)
 SELECT 
-    uuid_generate_v4(), -- Generate new UUID for profile
-    id,                -- Use existing id as auth_user_id
+    uuid_generate_v4(),
+    id,
     name,
     avatar_url,
     created_at,
@@ -100,7 +91,6 @@ SELECT
     is_active
 FROM temp_profiles;
 
--- Create a temporary table to store the id mappings
 CREATE TEMP TABLE id_mappings AS
 SELECT 
     old_profiles.id as old_id,
@@ -108,37 +98,30 @@ SELECT
 FROM temp_profiles old_profiles
 JOIN profiles new_profiles ON new_profiles.auth_user_id = old_profiles.id;
 
--- Update wallets table
 ALTER TABLE wallets
 RENAME COLUMN user_id TO profile_id;
 
--- Update wallets with new profile IDs
 UPDATE wallets w
 SET profile_id = m.new_id
 FROM id_mappings m
 WHERE w.profile_id = m.old_id::uuid;
 
--- Update transactions table
 ALTER TABLE transactions
 RENAME COLUMN user_id TO profile_id;
 
--- Update transactions with new profile IDs
 UPDATE transactions t
 SET profile_id = m.new_id
 FROM id_mappings m
 WHERE t.profile_id = m.old_id::uuid;
 
--- Update dispute_resolutions table
 ALTER TABLE dispute_resolutions
 RENAME COLUMN resolver_user_id TO resolver_profile_id;
 
--- Update dispute_resolutions with new profile IDs
 UPDATE dispute_resolutions dr
 SET resolver_profile_id = m.new_id
 FROM id_mappings m
 WHERE dr.resolver_profile_id = m.old_id::uuid;
 
--- Add new foreign key constraints
 ALTER TABLE wallets
 ADD CONSTRAINT wallets_profile_id_fkey 
     FOREIGN KEY (profile_id) 
@@ -157,12 +140,10 @@ ADD CONSTRAINT dispute_resolutions_resolver_profile_id_fkey
     REFERENCES profiles(id)
     ON DELETE CASCADE;
 
--- Recreate indexes with new column names
 CREATE INDEX idx_wallets_profile_id ON wallets(profile_id);
 CREATE INDEX idx_transactions_profile_id ON transactions(profile_id);
 CREATE INDEX idx_dispute_resolutions_resolver_profile_id ON dispute_resolutions(resolver_profile_id);
 
--- Update storage related function
 CREATE OR REPLACE FUNCTION handle_profile_picture_update()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -175,11 +156,9 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Drop temporary tables
 DROP TABLE IF EXISTS temp_profiles;
 DROP TABLE IF EXISTS id_mappings;
 
--- Add comments to document the changes
 COMMENT ON TABLE profiles IS 'Modified to use its own UUID as primary key with auth_user_id as foreign key to auth.users';
 COMMENT ON COLUMN profiles.id IS 'Primary key UUID for the profile';
 COMMENT ON COLUMN profiles.auth_user_id IS 'Foreign key reference to auth.users table';

@@ -35,13 +35,18 @@ interface Props {
 
 export const ValidationSucceededDialog: FunctionComponent<Props> = props => {
   const [showConfetti, setShowConfetti] = useState(false);
+  const [prevWorkAccepted, setPrevWorkAccepted] = useState(false);
+
+  if (props.workAccepted !== prevWorkAccepted) {
+    setPrevWorkAccepted(props.workAccepted);
+    setShowConfetti(props.workAccepted);
+  }
 
   useEffect(() => {
-    setShowConfetti(props.workAccepted);
-
     if (!props.workAccepted) return;
 
-    setTimeout(() => setShowConfetti(false), 5000);
+    const timeout = setTimeout(() => setShowConfetti(false), 5000);
+    return () => clearTimeout(timeout);
   }, [props.workAccepted]);
 
   return (

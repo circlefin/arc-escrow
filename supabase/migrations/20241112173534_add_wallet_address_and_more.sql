@@ -14,7 +14,6 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
--- Migration Up
 ALTER TABLE wallets
     ADD COLUMN wallet_set_id UUID,
     ADD COLUMN wallet_address VARCHAR(255),
@@ -23,7 +22,6 @@ ALTER TABLE wallets
 
 CREATE INDEX idx_wallets_address ON wallets(wallet_address);
 
--- Add comments for clarity
 COMMENT ON COLUMN wallets.wallet_set_id IS 'Reference to the wallet set';
 COMMENT ON COLUMN wallets.wallet_address IS 'Blockchain wallet address';
 COMMENT ON COLUMN wallets.account_type IS 'Type of blockchain account';

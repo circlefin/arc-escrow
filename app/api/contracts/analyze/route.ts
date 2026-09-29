@@ -18,15 +18,22 @@
 
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { openai } from "@/lib/utils/openAIClient";
 import { handleOpenAIError } from "@/lib/utils/openai-error-handler";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { getAuthenticatedUser, unauthorized } from "@/lib/auth/session";
+import { FILE_CONSTANTS } from "@/lib/constants";
 
-// Configure accepted file types and their processors
 const FILE_PROCESSORS = {
   "application/pdf": async (buffer: Buffer) => {
-    const data = await pdf(buffer);
-    return data.text;
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
   },
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
     async (buffer: Buffer) => {
@@ -67,6 +74,10 @@ const ANALYSIS_PROMPT = `
 `;
 
 export async function POST(req: Request) {
+  // Each call spends OpenAI credit and parses an uploaded file: signed-in users only.
+  const supabase = await createSupabaseServerClient();
+  if (!(await getAuthenticatedUser(supabase))) return unauthorized();
+
   if (!req.body) {
     return NextResponse.json({ error: "No body provided" }, { status: 400 });
   }
@@ -79,19 +90,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Check if file type is supported
-    if (!(file.type in FILE_PROCESSORS)) {
+    if (file.size > FILE_CONSTANTS.MAX_SIZE_5MB) {
+      return NextResponse.json(
+        { error: "Please upload a contract smaller than 5 MB" },
+        { status: 413 }
+      );
+    }
+
+    if (!Object.hasOwn(FILE_PROCESSORS, file.type)) {
       return NextResponse.json(
         { error: "Unsupported file type. Please upload a PDF or DOCX file." },
         { status: 400 }
       );
     }
 
-    // Process file
     const buffer = Buffer.from(await file.arrayBuffer());
     const textContent = await FILE_PROCESSORS[file.type as FileType](buffer);
 
-    // Analyze with OpenAI
     let completion;
     try {
       completion = await openai.chat.completions.create({
@@ -115,7 +130,6 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Error analyzing document:", error);
     
-    // Check if it's an OpenAI authentication error (might not have been caught above)
     const isAuthError = error instanceof Error && (
       error.message.includes("API key") || 
       error.message.includes("Incorrect API key") ||
