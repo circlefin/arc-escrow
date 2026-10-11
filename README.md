@@ -171,3 +171,5 @@ This sample application:
 - Handles secrets via environment variables
 - Verifies webhook signatures for security
 - Is not intended for production use without modification
+
+> **Important:** RLS is intentionally disabled for local development. See [SECURITY.md](SECURITY.md) for details on re-enabling it before any production deployment.

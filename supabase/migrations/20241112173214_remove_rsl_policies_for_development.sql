@@ -14,6 +14,11 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
+-- SECURITY NOTICE: This migration disables Row Level Security (RLS) for local/testnet
+-- development convenience. The original RLS policies are preserved in
+-- 20241112172956_create_initial_schema.sql. Before deploying with real user data,
+-- you MUST re-enable RLS and recreate appropriate policies — see SECURITY.md for details.
+
 -- Disable RLS on all tables
 ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE wallets DISABLE ROW LEVEL SECURITY;
