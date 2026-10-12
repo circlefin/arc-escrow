@@ -47,6 +47,29 @@ Automate escrow-backed freelance agreements with AI-powered work validation usin
 
    This creates a Circle developer-controlled wallet and writes the wallet ID, address, and blockchain values into your `.env.local`.
 
+   Run this bootstrap once for a new environment. The current script creates a
+   new wallet set and wallet on each invocation; it does not resume or reuse the
+   wallet IDs already in `.env.local`. If this environment already has a wallet,
+   keep its configuration and skip this step rather than creating another wallet.
+
+   Before running, ensure `.env.local` exists and contains the three assignments
+   shown above, even when their values are blank. The script updates existing
+   assignment lines; it does not append missing ones.
+
+   If wallet creation succeeds but writing `.env.local` fails, do not immediately
+   rerun the script. Recover the created wallet set ID, wallet ID and address from
+   the script output or your Circle Console, then restore the existing assignments:
+
+   ```dotenv
+   NEXT_PUBLIC_AGENT_WALLET_ID=<created-wallet-id>
+   NEXT_PUBLIC_AGENT_WALLET_ADDRESS=<created-wallet-address>
+   CIRCLE_BLOCKCHAIN=ARC-TESTNET
+   ```
+
+   Keep API keys and the entity secret server-side. Retain any previously created
+   wallet's ID/address when changing environments so that funds and agreements
+   tied to that wallet remain traceable.
+
 4. Set up the database — Choose one of the two paths below:
 
    <details>
