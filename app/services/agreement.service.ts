@@ -56,7 +56,7 @@ export const createAgreementService = (supabase: SupabaseClient) => ({
     beneficiaryWalletId: string;
     depositorWalletId: string;
     transactionId: string;
-    terms: any;
+    terms: EscrowAgreement["terms"];
   }): Promise<EscrowAgreement> {
     const { data: agreement, error } = await supabase
       .from("escrow_agreements")
@@ -77,7 +77,7 @@ export const createAgreementService = (supabase: SupabaseClient) => ({
     return agreement;
   },
 
-  async updateAgreementTerms(agreementId: string, terms: any): Promise<void> {
+  async updateAgreementTerms(agreementId: string, terms: EscrowAgreement["terms"]): Promise<void> {
     const { error } = await supabase
       .from("escrow_agreements")
       .update({ terms })
@@ -98,7 +98,7 @@ export const createAgreementService = (supabase: SupabaseClient) => ({
         supabase.from("transactions").delete().eq("id", transactionId),
       ]);
     } catch (error) {
-      const errorMessage = (error as any).message || "Unknown error";
+      const errorMessage = (error instanceof Error && error.message) || "Unknown error";
       throw new Error(`Failed to delete agreement and transaction: ${errorMessage}`);
     }
   },

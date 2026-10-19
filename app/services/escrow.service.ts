@@ -82,15 +82,14 @@ export const createEscrowService = (supabase: SupabaseClient) => ({
       throw new Error(`Failed to fetch agreements: ${error.message}`);
     }
 
-    // Modified data processing to keep both wallet details
     const filteredData = data?.map((agreement) => {
       const isDepositor = agreement.depositor_wallet?.profile_id === profileId;
 
       return {
         ...agreement,
-        userRole: isDepositor ? "depositor" : "beneficiary", // Optional: Add role context
-        depositor_wallet: agreement.depositor_wallet, // Keep original depositor wallet
-        beneficiary_wallet: agreement.beneficiary_wallet, // Keep original beneficiary wallet
+        userRole: isDepositor ? "depositor" : "beneficiary",
+        depositor_wallet: agreement.depositor_wallet,
+        beneficiary_wallet: agreement.beneficiary_wallet,
       };
     });
 

@@ -93,7 +93,6 @@ export const UploadContractButton = (props: CreateAgreementProps) => {
 
       setAnalyzingDocument(false);
 
-      // Check if analysis returned an error
       if ("error" in result) {
         toast.error("Analysis failed", {
           description: result.error,
@@ -102,7 +101,6 @@ export const UploadContractButton = (props: CreateAgreementProps) => {
         return;
       }
 
-      // Type assertion is safe here since we checked for error above
       const document = result as { amounts: Amount[], tasks: Task[] };
       setContractAmounts(document.amounts || []);
 

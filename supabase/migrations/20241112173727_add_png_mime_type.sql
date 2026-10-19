@@ -14,19 +14,14 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
--- migration_name: add_image_png_mime_type_to_agreement_documents
--- description: Adds 'image/png' to the allowed MIME types for the 'agreement-documents' storage bucket
-
 DO $$
 DECLARE
   v_bucket_exists boolean;
 BEGIN
- -- Check if bucket exists
  SELECT EXISTS (
    SELECT 1 FROM storage.buckets WHERE id = 'agreement-documents'
  ) INTO v_bucket_exists;
 
- -- Log the operation
  RAISE NOTICE 'Bucket agreement-documents exists: %', v_bucket_exists;
 
   INSERT INTO storage.buckets (
@@ -40,7 +35,7 @@ BEGIN
     'agreement-documents',
     'agreement-documents',
     false,
-    10485760,  -- 10MB limit
+    10485760,
     ARRAY[
       'image/png',
       'image/jpeg',

@@ -20,12 +20,12 @@ import { type NextRequest, type NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
-// server component can only get cookies and not set them, hence the "component" check
-export function createSupabaseServerClient(component: boolean = false) {
-  const cookieStore = cookies();
+// server components can only read cookies, not set them, hence the "component" check
+export async function createSupabaseServerClient(component: boolean = false) {
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -43,7 +43,6 @@ export function createSupabaseServerClient(component: boolean = false) {
 }
 
 export function createSupabaseServerComponentClient() {
-  cookies().getAll();
   return createSupabaseServerClient(true);
 }
 
@@ -51,10 +50,9 @@ export function createSupabaseReqResClient(
   req: NextRequest,
   res: NextResponse
 ) {
-  cookies().getAll();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {

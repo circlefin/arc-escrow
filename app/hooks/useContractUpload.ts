@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { createFileService } from "@/app/services/file.service";
 import { createAgreementService } from "@/app/services/agreement.service";
 import { CreateAgreementProps } from "@/types/agreements";
-import { createClient } from "@/lib/utils/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { parseAmount } from "@/lib/utils/amount";
 
 interface Amount {
@@ -50,7 +50,7 @@ export interface DocumentAnalysis {
 export const useContractUpload = (props: CreateAgreementProps) => {
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
-  const supabase = createClient();
+  const supabase = createSupabaseBrowserClient();
   const fileService = createFileService(supabase);
   const agreementService = createAgreementService(supabase);
 
@@ -69,15 +69,12 @@ export const useContractUpload = (props: CreateAgreementProps) => {
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
 
-        // Handle different error scenarios with user-friendly messages
         let message = body.error || "Failed to analyze document";
 
-        // For retryable errors, add retry prompt
         if (body.retryable) {
           message = `${message} Please try again.`;
         }
 
-        // Ensure authentication/configuration errors are user-friendly
         if (body.code === "auth_error" || message.includes("AI service")) {
           message =
             "AI service is not properly configured. Please contact support to resolve this issue.";
@@ -114,13 +111,10 @@ export const useContractUpload = (props: CreateAgreementProps) => {
     try {
       fileService.validateFile(file);
 
-      // Upload to temp location
       tempPath = await fileService.uploadToTemp(file, props.userId);
 
-      // Analyze document using the new API
       const analysisResult = await analyzeDocument(file);
 
-      // Check if analysis returned an error
       if ("error" in analysisResult) {
         throw new Error(analysisResult.error);
       }
@@ -131,7 +125,6 @@ export const useContractUpload = (props: CreateAgreementProps) => {
         throw new Error("No amounts found in the document");
       }
 
-      // Create transaction with the new amount format
       const amount = parseAmount(analysis.amounts[0].amount);
       const transaction = await agreementService.createTransaction({
         walletId: props.depositorWalletId!,
@@ -141,7 +134,6 @@ export const useContractUpload = (props: CreateAgreementProps) => {
           analysis.amounts[0]?.payment_for || "Escrow agreement deposit",
       });
 
-      // Create agreement
       const agreement = await agreementService.createAgreement({
         beneficiaryWalletId: props.beneficiaryWalletId,
         depositorWalletId: props.depositorWalletId!,
@@ -152,17 +144,14 @@ export const useContractUpload = (props: CreateAgreementProps) => {
         },
       });
 
-      // Move file to final location
       const finalPath = await fileService.downloadAndUploadToFinal(
         tempPath,
         file,
         agreement.id
       );
 
-      // Cleanup temp file
       await fileService.deleteTempFile(tempPath);
 
-      // Get public URL and update agreement
       const signedUrl = await fileService.getSignedUrl(finalPath);
       await agreementService.updateAgreementTerms(agreement.id, {
         ...analysis,

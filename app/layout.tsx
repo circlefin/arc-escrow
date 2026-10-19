@@ -18,11 +18,14 @@
 
 import { EnvVarWarning } from "@/components/env-var-warning";
 import HeaderAuth from "@/components/header-auth";
-import { hasEnvVars } from "@/lib/utils/supabase/check-env-vars";
+import { hasEnvVars } from "@/lib/supabase/check-env-vars";
 import { Oxanium } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { FlashToast } from "@/components/flash-toast";
+import { FLASH_COOKIE, parseFlashMessage } from "@/lib/flash-message";
 import "./globals.css";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 
@@ -46,6 +49,8 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const flashMessage = parseFlashMessage((await cookies()).get(FLASH_COOKIE)?.value);
+
   return (
     <html lang="en" className={oxanium.variable} suppressHydrationWarning>
       <body className="bg-background text-foreground font-sans">
@@ -56,6 +61,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <Toaster expand />
+          <FlashToast message={flashMessage} />
           <div className="min-h-screen flex flex-col">
             {/* Fixed Header */}
             <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-sm border-b-foreground/10 h-16">

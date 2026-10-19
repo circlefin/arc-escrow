@@ -90,7 +90,6 @@ export const EscrowAgreementsTable = (props: EscrowAgreementsTableProps) => {
     }
   );
 
-  // Calculate pagination
   const totalPages = Math.ceil(filteredAgreements.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedAgreements = filteredAgreements.slice(

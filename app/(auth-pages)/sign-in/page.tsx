@@ -17,14 +17,13 @@
  */
 
 import { signInAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
 import { GoogleLoginButton } from "@/components/google-login-button";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
-export default function Login({ searchParams }: { searchParams: Message }) {
+export default function Login() {
   return (
     <div className="flex flex-col gap-6">
       <form className="flex-1 flex flex-col min-w-64">
@@ -32,7 +31,7 @@ export default function Login({ searchParams }: { searchParams: Message }) {
           Sign in
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link
             className="text-blue-600 hover:text-blue-500 transition-colors font-medium" 
             href="/sign-up"
@@ -71,7 +70,6 @@ export default function Login({ searchParams }: { searchParams: Message }) {
             />
           </div>
 
-          <FormMessage message={searchParams} />
 
           <SubmitButton
             className="w-full"

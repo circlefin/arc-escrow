@@ -54,9 +54,6 @@ interface Amount {
   location: string;
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? process.env.NEXT_PUBLIC_VERCEL_URL
-  : "http://localhost:3000";
 
 const supabase = createSupabaseBrowserClient();
 
@@ -84,7 +81,7 @@ export const EscrowAgreementItem: React.FC<EscrowAgreementCardProps> = ({
     setIssuingRefund(circleContractId);
 
     try {
-      const response = await fetch(`${baseUrl}/api/contracts/escrow/refund`, {
+      const response = await fetch(`/api/contracts/escrow/refund`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -126,7 +123,7 @@ export const EscrowAgreementItem: React.FC<EscrowAgreementCardProps> = ({
         formData.append("circleContractId", circleContractId)
         formData.append("file", file);
 
-        const response = await fetch(`${baseUrl}/api/contracts/validate-work`, {
+        const response = await fetch(`/api/contracts/validate-work`, {
           method: "POST",
           body: formData,
           credentials: "include",
@@ -167,7 +164,7 @@ export const EscrowAgreementItem: React.FC<EscrowAgreementCardProps> = ({
   const approveDeposit = async (agreement: EscrowAgreementWithDetails) => {
     preApproveCallback();
 
-    const approveResponse = await fetch(`${baseUrl}/api/contracts/escrow/deposit/approve`, {
+    const approveResponse = await fetch(`/api/contracts/escrow/deposit/approve`, {
       method: "POST",
       body: JSON.stringify({
         circleContractId: agreement.circle_contract_id,

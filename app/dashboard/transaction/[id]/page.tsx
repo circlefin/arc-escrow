@@ -16,21 +16,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? process.env.NEXT_PUBLIC_VERCEL_URL
-  : "http://localhost:3000";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { getCircleTransactionVisibleTo } from "@/lib/circle/wallet-data";
 
-export default async function Transaction({
-  params,
-}: {
-  params: { id: string };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function Transaction(props: {
+  params: Promise<{ id: string }>;
 }) {
-  const response = await fetch(
-    `${baseUrl}/api/wallet/transactions/${params.id}`,
-  );
-  const parsedResponse = await response.json();
+  const params = await props.params;
 
-  if (parsedResponse.error) {
+  // Read on the server, as the signed-in user: a fetch to our own API would not
+  // carry their cookies, and the API now requires them.
+  const supabase = await createSupabaseServerClient();
+  const transaction = UUID.test(params.id)
+    ? await getCircleTransactionVisibleTo(supabase, params.id).catch(() => null)
+    : null;
+
+  if (!transaction) {
     return (
       <h2 className="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
         Invalid transaction
@@ -39,13 +42,13 @@ export default async function Transaction({
   }
 
   const transactionCreationTimestamp = new Date(
-    parsedResponse.transaction.createDate,
+    transaction.createDate,
   );
   const creationDate = transactionCreationTimestamp.toLocaleDateString();
   const creationTime = transactionCreationTimestamp.toLocaleTimeString();
 
   const transactionLastUpdateTimestamp = new Date(
-    parsedResponse.transaction.updateDate,
+    transaction.updateDate,
   );
   const lastUpdateDate = transactionLastUpdateTimestamp.toLocaleDateString();
   const lastUpdateTime = transactionLastUpdateTimestamp.toLocaleTimeString();
@@ -57,19 +60,19 @@ export default async function Transaction({
       </h2>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">ID</h3>
       <p className="text-sm text-muted-foreground mb-4">
-        {parsedResponse.transaction.id}
+        {transaction.id}
       </p>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
         Amount transferred
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
-        {parsedResponse.transaction.amounts[0]}
+        {transaction.amounts?.[0]}
       </p>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
         State
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
-        {parsedResponse.transaction.state}
+        {transaction.state}
       </p>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
         Creation date
@@ -81,13 +84,13 @@ export default async function Transaction({
         Blockchain
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
-        {parsedResponse.transaction.blockchain}
+        {transaction.blockchain}
       </p>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
         Transaction type
       </h3>
       <p className="text-sm text-muted-foreground mb-4">
-        {parsedResponse.transaction.transactionType}
+        {transaction.transactionType}
       </p>
       <h3 className="scroll-m-20 text-2xl font-semibold tracking-tight">
         Last updated

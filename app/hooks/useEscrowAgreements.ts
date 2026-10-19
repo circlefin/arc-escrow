@@ -21,7 +21,7 @@ import { toast } from "sonner";
 
 import { createEscrowService } from "@/app/services/escrow.service";
 import { EscrowAgreementWithDetails, EscrowListProps } from "@/types/escrow";
-import { createClient } from "@/lib/utils/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export const useEscrowAgreements = ({ profileId }: EscrowListProps) => {
   const [agreements, setAgreements] = useState<EscrowAgreementWithDetails[]>(
@@ -30,7 +30,7 @@ export const useEscrowAgreements = ({ profileId }: EscrowListProps) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const escrowService = useMemo(
     () => createEscrowService(supabase),
     [supabase]

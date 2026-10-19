@@ -20,11 +20,11 @@ import Link from "next/link";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { signOutAction } from "@/app/actions";
-import { hasEnvVars } from "@/lib/utils/supabase/check-env-vars";
+import { hasEnvVars } from "@/lib/supabase/check-env-vars";
 import { createSupabaseServerComponentClient } from "@/lib/supabase/server-client";
 
 export default async function AuthButton() {
-  const supabase = createSupabaseServerComponentClient();
+  const supabase = await createSupabaseServerComponentClient();
 
   const {
     data: { user },
@@ -45,7 +45,7 @@ export default async function AuthButton() {
               variant={"default"}
               className="font-normal pointer-events-none"
             >
-              Please update .env.local file with anon key and url
+              Please update .env.local file with publishable key and url
             </Badge>
           </div>
           <div className="flex gap-2">

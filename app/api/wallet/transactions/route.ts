@@ -19,6 +19,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 import { z } from "zod";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import {
+  forbidden,
+  getAuthenticatedUser,
+  getOwnWallet,
+  unauthorized,
+} from "@/lib/auth/session";
 
 const WalletIdSchema = z.object({
   walletId: z.string().uuid(),
@@ -52,6 +59,10 @@ export async function POST(
   req: NextRequest,
 ): Promise<NextResponse<WalletTransactionsResponse>> {
   try {
+    const supabase = await createSupabaseServerClient();
+    const user = await getAuthenticatedUser(supabase);
+    if (!user) return unauthorized() as NextResponse<WalletTransactionsResponse>;
+
     const body = await req.json();
     const parseResult = WalletIdSchema.safeParse(body);
 
@@ -63,6 +74,12 @@ export async function POST(
     }
 
     const { walletId } = parseResult.data;
+
+    // Only your own wallet: any signed-in user can list every wallet id.
+    const ownWallet = await getOwnWallet(supabase, user.id);
+    if (!ownWallet || ownWallet.circle_wallet_id !== walletId) {
+      return forbidden() as NextResponse<WalletTransactionsResponse>;
+    }
 
     const response = await circleDeveloperSdk.listTransactions({
       walletIds: [walletId],

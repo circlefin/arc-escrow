@@ -21,7 +21,7 @@
 import type { EscrowAgreementWithDetails } from "@/types/escrow";
 import { useSmartContract } from "@/app/hooks/useSmartContract";
 import { Button } from "@/components/ui/button";
-import { SYSTEM_AGENT_ADDRESS, SYSTEM_AGENT_WALLET_ID, USDC_CONTRACT_ADDRESS } from "@/lib/constants";
+import { SYSTEM_AGENT_ADDRESS, SYSTEM_AGENT_WALLET_ID } from "@/lib/constants";
 import { Loader2, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,7 +37,7 @@ export const CreateSmartContractButton = ({
   const { createSmartContract, isLoading } = useSmartContract();
 
   const handleCreateSmartContract = async () => {
-    if (!SYSTEM_AGENT_ADDRESS || !SYSTEM_AGENT_WALLET_ID || !USDC_CONTRACT_ADDRESS) {
+    if (!SYSTEM_AGENT_ADDRESS || !SYSTEM_AGENT_WALLET_ID) {
       toast.error("Configuration Error", {
         description:
           "System is not properly configured. Please check your environment variables.",
@@ -79,8 +79,7 @@ export const CreateSmartContractButton = ({
         isLoading ||
         disabled ||
         !SYSTEM_AGENT_ADDRESS ||
-        !SYSTEM_AGENT_WALLET_ID ||
-        !USDC_CONTRACT_ADDRESS
+        !SYSTEM_AGENT_WALLET_ID
       }
     >
       {isLoading ? (

@@ -14,14 +14,11 @@
 --
 -- SPDX-License-Identifier: Apache-2.0
 
--- Enable storage extensions if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Add avatar_url column to profiles if not exists
 ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
--- Create storage buckets
 INSERT INTO storage.buckets (id, name, public, avif_autodetection, file_size_limit, allowed_mime_types)
 VALUES
     ('profile-pictures', 'profile-pictures', false, false, 5242880, ARRAY['image/jpeg', 'image/png', 'image/gif']),
@@ -32,7 +29,6 @@ SET
     file_size_limit = EXCLUDED.file_size_limit,
     allowed_mime_types = EXCLUDED.allowed_mime_types;
 
--- Drop existing policies if they exist (to avoid conflicts on rerun)
 DROP POLICY IF EXISTS "Give users read access to profile pictures" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to upload their own profile picture" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to update their own profile picture" ON storage.objects;
@@ -42,7 +38,6 @@ DROP POLICY IF EXISTS "Allow users to upload agreement documents" ON storage.obj
 DROP POLICY IF EXISTS "Allow users to view dispute evidence" ON storage.objects;
 DROP POLICY IF EXISTS "Allow users to upload dispute evidence" ON storage.objects;
 
--- Profile Pictures bucket policies
 CREATE POLICY "Give users read access to profile pictures"
 ON storage.objects FOR SELECT
 USING (
@@ -75,7 +70,6 @@ USING (
     (auth.uid() = (NULLIF(storage.foldername(name)::text, '')::uuid))
 );
 
--- Agreement Documents bucket policies
 CREATE POLICY "Allow users to view their agreement documents"
 ON storage.objects FOR SELECT
 USING (
@@ -100,7 +94,6 @@ WITH CHECK (
     )
 );
 
--- Dispute Evidence bucket policies
 CREATE POLICY "Allow users to view dispute evidence"
 ON storage.objects FOR SELECT
 USING (
@@ -127,13 +120,11 @@ WITH CHECK (
     )
 );
 
--- Drop existing triggers and functions if they exist
 DROP TRIGGER IF EXISTS on_profile_picture_change ON storage.objects;
 DROP TRIGGER IF EXISTS enforce_storage_structure ON storage.objects;
 DROP FUNCTION IF EXISTS handle_profile_picture_update();
 DROP FUNCTION IF EXISTS storage_folder_structure();
 
--- Helper function to handle profile picture updates
 CREATE OR REPLACE FUNCTION handle_profile_picture_update()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -146,7 +137,6 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Helper function to ensure proper folder structure
 CREATE OR REPLACE FUNCTION storage_folder_structure()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -168,7 +158,6 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers
 CREATE TRIGGER on_profile_picture_change
     AFTER INSERT OR UPDATE ON storage.objects
     FOR EACH ROW
@@ -180,5 +169,3 @@ CREATE TRIGGER enforce_storage_structure
     FOR EACH ROW
     EXECUTE FUNCTION storage_folder_structure();
 
--- Add comment to describe migration
-COMMENT ON TABLE storage.objects IS 'Storage configuration added in migration 2. Contains bucket policies for profile pictures, agreement documents, and dispute evidence.';

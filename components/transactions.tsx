@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/pagination";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WALLET_REFRESH_EVENT } from "@/lib/wallet-refresh";
 
 interface Transaction {
   id: string;
@@ -64,7 +65,7 @@ interface CircleTransaction {
 interface Props {
   wallet: Wallet;
   profile: {
-    id: any;
+    id: string;
   } | null;
 }
 
@@ -73,12 +74,11 @@ const ITEMS_PER_PAGE = 5;
 async function syncTransactions(
   supabase: SupabaseClient,
   walletId: string,
-  profileId: string,
+  profileId: string | undefined,
   circleWalletId: string
 ) {
-  // 1. Fetch transactions from Circle API
   const transactionsResponse = await fetch(
-    `${baseUrl}/api/wallet/transactions`,
+    `/api/wallet/transactions`,
     {
       method: "POST",
       body: JSON.stringify({
@@ -97,22 +97,19 @@ async function syncTransactions(
     return [];
   }
 
-  // 2. Get existing transactions from database
   const { data: existingTransactions } = await supabase
     .from("transactions")
     .select("circle_transaction_id")
     .eq("wallet_id", walletId);
 
   const existingTransactionIds = new Set(
-    existingTransactions?.map((t: any) => t.circle_transaction_id) || []
+    existingTransactions?.map((t: { circle_transaction_id: string }) => t.circle_transaction_id) || []
   );
 
-  // 3. Filter out transactions that already exist
   const newTransactions = parsedTransactions.transactions.filter(
-    (transaction: any) => !existingTransactionIds.has(transaction.id)
+    (transaction: CircleTransaction) => !existingTransactionIds.has(transaction.id)
   );
 
-  // 4. Insert new transactions into the database
   if (newTransactions.length > 0) {
     const transactionsToInsert = newTransactions.map(
       (transaction: CircleTransaction) => {
@@ -147,18 +144,16 @@ async function syncTransactions(
     }
   }
 
-  // 5. Return all transactions from database
   const { data: allTransactions } = await supabase
     .from("transactions")
     .select("*")
     .eq("wallet_id", walletId)
     .order("created_at", { ascending: false });
 
-  // Filter out duplicates keeping only the latest transaction for each circle_transaction_id
   const uniqueTransactions =
     allTransactions?.reduce((acc, current) => {
       const existingTransaction = acc.find(
-        (item: { circle_transaction_id: any }) =>
+        (item: { circle_transaction_id: string }) =>
           item.circle_transaction_id === current.circle_transaction_id
       );
       if (!existingTransaction) {
@@ -170,9 +165,6 @@ async function syncTransactions(
   return uniqueTransactions;
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-  ? process.env.NEXT_PUBLIC_VERCEL_URL
-  : "http://localhost:3000";
 
 const supabase = createSupabaseBrowserClient();
 
@@ -197,7 +189,6 @@ export const Transactions: FunctionComponent<Props> = (props) => {
     [data]
   );
 
-  // Calculate pagination
   const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedData = formattedData.slice(
@@ -209,7 +200,6 @@ export const Transactions: FunctionComponent<Props> = (props) => {
     try {
       setLoading(true);
 
-      // Sync and get transactions
       const transactions = await syncTransactions(
         supabase,
         props.wallet?.id,
@@ -231,7 +221,8 @@ export const Transactions: FunctionComponent<Props> = (props) => {
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          // Every change, not just UPDATE: inbound deposits arrive as INSERTs.
+          event: "*",
           schema: "public",
           table: "transactions",
           filter: `profile_id=eq.${props.profile?.id}`,
@@ -240,10 +231,15 @@ export const Transactions: FunctionComponent<Props> = (props) => {
       )
       .subscribe();
 
+    // No-webhook fallback: re-sync from Circle when nothing wrote the row.
+    const onRefresh = () => void updateTransactions();
+    window.addEventListener(WALLET_REFRESH_EVENT, onRefresh);
+
     updateTransactions();
 
     return () => {
       supabase.removeChannel(transactionSubscription);
+      window.removeEventListener(WALLET_REFRESH_EVENT, onRefresh);
     };
   }, []);
 

@@ -17,21 +17,12 @@
  */
 
 import { signUpAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 
-export default function Signup({ searchParams }: { searchParams: Message }) {
-  if ("message" in searchParams) {
-    return (
-      <div className="flex items-center justify-center p-4">
-        <FormMessage message={searchParams} />
-      </div>
-    );
-  }
-
+export default function Signup() {
   return (
     <div className="flex flex-col gap-6">
       <form className="flex-1 flex flex-col min-w-64">
@@ -95,7 +86,6 @@ export default function Signup({ searchParams }: { searchParams: Message }) {
             />
           </div>
 
-          <FormMessage message={searchParams} />
 
           <SubmitButton
             className="w-full"

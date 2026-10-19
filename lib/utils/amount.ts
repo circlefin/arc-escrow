@@ -22,7 +22,6 @@ export const parseAmount = (amountStr: string): number => {
     .replace(/[$€£,\s]/g, "")
     .replace(/−/g, "-");
 
-  // Parse the amount
   const amount = parseFloat(cleanAmount);
 
   if (Number.isNaN(amount) || amount <= 0) {

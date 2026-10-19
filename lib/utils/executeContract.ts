@@ -62,13 +62,3 @@ export const executeContract = async ({
   }
 };
 
-// Example usage:
-/*
-await executeContract({
-  walletId: "wallet_123",
-  contractAddress: "0x1234...5678",
-  abiFunctionSignature: "transfer(address,uint256)",
-  abiParameters: ["0xabcd...efgh", "1000000000000000000"],
-  feeLevel: "HIGH"
-});
-*/

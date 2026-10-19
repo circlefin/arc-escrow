@@ -17,8 +17,10 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { circleDeveloperSdk } from "@/lib/utils/developer-controlled-wallets-client";
 import { z } from "zod";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { getAuthenticatedUser, unauthorized } from "@/lib/auth/session";
+import { getCircleTransactionVisibleTo } from "@/lib/circle/wallet-data";
 
 const ResponseSchema = z.object({
   transaction: z
@@ -45,10 +47,10 @@ if (!process.env.CIRCLE_API_KEY || !process.env.CIRCLE_ENTITY_SECRET) {
 
 export async function GET(
   _: NextRequest,
-  { params }: { params: { id: string } },
+  props: { params: Promise<{ id: string }> },
 ): Promise<NextResponse<TransactionResponse>> {
+  const params = await props.params;
   try {
-    // Validate the transaction ID is a Circle's transaction IDs
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(params.id)) {
@@ -58,13 +60,20 @@ export async function GET(
       );
     }
 
-    const response = await circleDeveloperSdk.getTransaction({
-      id: params.id,
-    });
+    const supabase = await createSupabaseServerClient();
+    const user = await getAuthenticatedUser(supabase);
+    if (!user) return unauthorized() as NextResponse<TransactionResponse>;
 
-    const parseResult = ResponseSchema.safeParse({
-      transaction: response.data?.transaction,
-    });
+    // Only a transaction the user can see (their own, or one on their agreements).
+    const transaction = await getCircleTransactionVisibleTo(supabase, params.id);
+    if (!transaction) {
+      return NextResponse.json(
+        { error: "Transaction not found" },
+        { status: 404 },
+      );
+    }
+
+    const parseResult = ResponseSchema.safeParse({ transaction });
     if (!parseResult.success) {
       console.error("Response validation failed:", parseResult.error);
       return NextResponse.json(
@@ -72,23 +81,6 @@ export async function GET(
         { status: 500 },
       );
     }
-
-    if (!response.data || response.data.transaction === undefined) {
-      return NextResponse.json(
-        { error: "Transaction not found" },
-        { status: 404 },
-      );
-    }
-    //Needs to be fixed
-    const transaction: any = {
-      id: response.data.transaction.id,
-      amounts: response.data.transaction.amounts,
-      state: response.data.transaction.state,
-      createDate: response.data.transaction.createDate,
-      blockchain: response.data.transaction.blockchain,
-      transactionType: response.data.transaction.transactionType,
-      updateDate: response.data.transaction.updateDate,
-    };
 
     return NextResponse.json({ transaction });
   } catch (error) {

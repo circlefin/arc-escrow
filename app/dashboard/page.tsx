@@ -22,15 +22,13 @@ import { CreateAgreementPage } from "@/components/ui/createAgreementPage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EscrowAgreements } from "@/components/escrow-agreements";
 import { WalletBalance } from "@/components/wallet-balance";
-import { RequestUsdcButton } from "@/components/request-usdc-button";
-import { USDCButton } from "@/components/usdc-button";
-import dynamic from "next/dynamic";
+import { AddMoneyButton } from "@/components/add-money-button";
+import { Transactions } from "@/components/transactions-client";
 import { WalletInformationDialog } from "@/components/wallet-information-dialog";
 
-const Transactions = dynamic(() => import('@/components/transactions').then(mod => mod.Transactions), { ssr: false })
 
 export default async function ProtectedPage() {
-  const supabase = createSupabaseServerComponentClient();
+  const supabase = await createSupabaseServerComponentClient();
 
   const {
     data: { user },
@@ -55,10 +53,10 @@ export default async function ProtectedPage() {
 
   return (
     <>
-      <div className="flex flex-wrap space-x-4 mb-4">
+      <div className="flex flex-wrap items-start space-x-4 mb-4">
         {/* Wallet Card */}
         <Card className="break-inside-avoid w-[calc(50%-0.5rem)]">
-          <CardHeader className="flex-row items-center space-between">
+          <CardHeader className="flex items-center">
             <CardTitle>Account balance</CardTitle>
             <WalletInformationDialog wallet={wallet} />
           </CardHeader>
@@ -70,9 +68,7 @@ export default async function ProtectedPage() {
                 </h1>
               </div>
               <div className="flex gap-2">
-                <USDCButton className="flex-1" mode="BUY" walletAddress={wallet?.wallet_address} />
-                <USDCButton className="flex-1" mode="SELL" walletAddress={wallet?.wallet_address} />
-                {process.env.NODE_ENV === "development" && <RequestUsdcButton walletAddress={wallet?.wallet_address} />}
+                <AddMoneyButton className="flex-1" />
               </div>
             </div>
           </CardContent>

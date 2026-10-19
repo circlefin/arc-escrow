@@ -53,7 +53,6 @@ export interface EscrowAgreement {
   };
   created_at: string;
   updated_at: string;
-  // Wallet relationships
   depositor_wallet: {
     profile_id: string;
     wallet_address: string;
@@ -75,7 +74,6 @@ export interface EscrowAgreement {
     circle_contract_address: string;
   };
 }
-
 
 export interface CreateAgreementProps {
   beneficiaryWalletId?: string;

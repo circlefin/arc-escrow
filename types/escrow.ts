@@ -19,7 +19,6 @@
 import { EscrowAgreement } from "./agreements";
 
 export interface EscrowAgreementWithDetails extends EscrowAgreement {
-  // Wallet IDs
   beneficiary_wallet_id: string;
   depositor_wallet_id: string;
   circle_contract_id: string;
